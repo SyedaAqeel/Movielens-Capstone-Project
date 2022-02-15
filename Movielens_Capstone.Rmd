@@ -1,0 +1,946 @@
+---
+title: "Movielens_Capstone"
+author: "Syeda Aqeel"
+date: "2/8/2022"
+output:
+  pdf_document: default
+---
+
+#MOVIE RECOMMENDATION SYSTEM 
+
+#MOVIELENS PROJECT 
+
+#HarvardX PH125.9x
+#Data Science: Capstone
+
+
+
+
+#INTRODUCTION 
+
+Recommendation System predicts users’ responses to given options. A widely seen example is of suggestions given to customers of online retailer based on their product searches or purchase history. This is a type of Product Recommendation. Similar systems are created for movie recommendations based on ratings provided by users. And for news articles suggestions based on the articles that readers have read in the past. 
+The following report explores MovieLens data set to model Movie Recommendation System. This document is part of Professional Certificate Program in Data Science offered by HarvardX. 
+The R markdown code used to generate this document is available on GitHub.
+
+#MOVIELENS DATA SET 
+
+A research lab in the Department of Computer Science and Engineering at the University of Minnesota, GroupLens Research Project, collected MovieLens data sets.  
+The 10M data set contains 10000054 ratings of 10681 movies by 71567 random users of the online movie recommender service MovieLens. The users are represented only by an id and no other demographic information was collected. 
+
+#PROJECT OBJECTIVE 
+
+This project aims to create a recommendation system with Machine Learning algorithms for MovieLens data set. The evaluation criterion for the project is based on Root Mean Square Error (RMSE) lower than 0.8649. 
+Root Mean Square Error (RMSE) is defined as follows: 
+
+RMSE=\sqrt{\frac{1}{N}\sum_{u,i}(\hat{y}_{u,i}-y_{u,i})^2}
+
+where N is the number of ratings, y_(u,i) is the rating given to movie i by user u and y ̂_(u,i) is the predicted rating of movie i by user u.
+It will evaluate how close our estimated ratings are to observed ratings. 
+
+
+
+
+#PROJECT FRAMEWORK 
+
+This project will follow following structure:
+
+1.Importing Data set
+
+The data set will be loaded from MovieLens website in to RStudio interface.
+
+2.Cleaning Data set
+
+Data will then be divided in to two sets: edx and validation set. 
+Edx set will contain 90% of original data while Validation set will have 10% entries of original set. The latter will only be used to test final algorithm.
+We’ll process edx set to be in tidy format such as converting timestamp feature in to date format and extracting year of release in which movie released from its title.  
+	
+3.Exploring and visually analyzing Data set
+
+Bar graphs, boxplots, error bars and other visual and statistical representations of data will aid in understanding features of data sets. 
+	
+4.Modelling Data set
+
+We’ll model data set based on insights gained in data exploration. To model, we’ll generate two more data sets from edx set: Train set and Test set. 90% of edx entries will be in Train set while Test set will hold only 10% of edx entries. We’ll predict ratings with Test set and evaluate results with RMSE. 
+
+5.Analyzing Results
+
+Results obtained through all the models we’ll apply to MovieLens data will be analyzed to find minimum RMSE. The method of modelling with lowest RMSE will then be applied to final set of data (edx set) to train and validate.  
+
+6.Reporting results. 
+
+Final results will be reported to form conclusion and observe limitations. 
+
+
+
+#METHODS & ANALYSIS 
+
+#DATA CLEANING 
+
+We’ll begin with loading MovieLens dataset into our interface. And split it in to two sets: edx set and validation set. We’ll train and test our final model on these sets respectively. Edx set will have 90% of original entries of MovieLens data set while rest 10% entries will be in validation set
+
+
+
+```{r}
+####################################
+#MOVIE RECOMMENDATION CAPSTONE PROJECT 
+####################################
+
+
+##########################################################
+# Create edx set, validation set (final hold-out test set)
+##########################################################
+
+# Note: this process could take a couple of minutes
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+
+library(tidyverse)
+library(caret)
+library(data.table)
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+
+# if using R 4.0 or later:
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+```
+
+#DATA EXPLORATION 
+
+
+Exploratory analysis will aid in understanding data set’s construct. It will help summarize data set’s main characteristics. And discover patterns and visualize these patterns.
+We’ll begin with observing data set’s dimension. 
+
+
+```{r}
+#################################
+# Examining edx Data Set
+#################################
+
+# Number of rows and columns in edx data set 
+dim(edx)
+```
+Edx data set consists 9000055 rows and 6 columns. 
+
+```{r}
+# Structure of the edx data set
+str(edx)
+```
+The 6 variables in data set are userId, movieId, rating, timestamp, title, and genres. Variables fall under integer, numeric or character class.   
+
+There are 10677 unique movies in data set. 
+
+```{r}
+#Number of distinct movies in edx data set
+n_distinct(edx$movieId)
+
+```
+
+There are 69878 unique users.
+
+```{r}
+# Number of distinct users in edx data set
+n_distinct(edx$userId)
+```
+
+
+The ratings given to movies are of 10 distinct values.
+
+```{r}
+# Number of distinct ratings given to movies in edx data set
+n_distinct(edx$rating)
+
+# Range of ratings in edx data set
+range(edx$rating)
+```
+The values range from rating of 0.5 to 5. 
+
+The number unique genres in data set are 797.
+
+```{r}
+# Number of distinct genres
+n_distinct(edx$genres)
+```
+Loading all required libraries. 
+
+```{r}
+###########################
+# Loading required libraries 
+###########################
+
+library(dplyr)
+library(lubridate)
+library(ggthemes)
+library(scales)
+```
+
+
+We’ll tidy data to ease our analysis.
+
+
+Timestamp is converted in to date format. And year in which movie is released is extracted from title column. 
+
+
+```{r}
+###########################
+# Tidying edx data set 
+###########################
+
+# Extracting Dates 
+
+edx <- mutate(edx, date = as_datetime(timestamp))
+
+# Extracting year in which movie released 
+
+edx <- edx %>% mutate(title = str_trim(title)) %>%
+  extract(title, c("Tp", "release"),
+  regex = "^(.*) \\(([0-9 \\-]*)\\)$",remove = F)%>%
+  mutate(release = if_else(str_length(release) > 4,
+  as.integer(str_split(release, "-", simplify = T)[1]), as.integer(release)))%>%
+  mutate(title = if_else(is.na(Tp), title, Tp)) %>%
+  select(-Tp)
+```
+
+
+#DATA VISUALIZATION 
+
+#MOVIE DATA 
+
+We’ll look in to movies data and visually explore trends and patterns. 
+
+
+
+```{r}
+#############################
+# Exploring Movies data
+#############################
+
+# Plot histogram of distribution of movies
+edx %>% count(movieId) %>% ggplot(aes(n)) +
+geom_histogram(bins = 30, color = "white") +
+scale_x_log10() + 
+ggtitle("Distribution of Movies") +
+xlab("Number of Ratings") +
+ylab("Number of Movies") + 
+theme_stata()
+```
+The plot shows that distribution of movies with respect to their ratings follow a bell-shaped curve or normal distribution. 
+
+To further our analysis, we plotted box plot of movies in the year they released. 
+
+```{r}
+# Plot box plot of ratings for movies in release year
+
+ edx %>% group_by(movieId) %>%
+  summarize(Ratings = n(), Year = as.character(release)) %>%
+  qplot(Year, Ratings, data = ., geom = "boxplot") +
+  coord_trans(y = "sqrt") +
+  ggtitle("Ratings in Year of Release") +
+  theme_stata(base_size = 3)
+```
+
+From the plot, you can see that the year with the highest median number of ratings is 1995.
+
+#USER DATA 
+
+Here we use visual tools to gain better insights of user data. 
+
+```{r}
+#############################
+# Exploring Users Data
+#############################
+# Plot histogram of distribution of users
+
+edx %>% count(userId) %>%
+  ggplot(aes(n)) +
+  geom_histogram(bin = 30, color = "white") +
+  scale_x_log10() + 
+  ggtitle("Users") +  theme_stata()
+
+```
+From bar chart we can conclude that number of ratings given by users don’t follow normal distribution and observations are denser toward the right tail.  
+
+To inspect if all movies were rated equally by users, we plot heatmap of users and movies. 
+
+
+```{r}
+# Plot heatmap of users and movies 
+
+users <- sample(unique(edx$userId), 100)
+edx %>% filter(userId %in% users) %>%
+  select(userId, movieId, rating) %>%
+  mutate(rating = 1) %>%
+  spread(movieId, rating) %>% 
+  select(sample(ncol(.), 100)) %>% 
+  as.matrix() %>% t(.) %>%
+  image(1:100, 1:100,. , xlab="Movies", ylab="Users")
+abline(h=0:100+0.5, v=0:100+0.5, col = "grey")
+```
+Result from plot shows that movies in data set didn’t receive equal number of ratings. Some users voted less than others. 
+
+
+#RATINGS DATA 
+
+
+Now we look closely in to ratings data set
+
+
+
+```{r}
+###############################
+# Exploring Ratings Data
+###############################
+
+# Distribution of ratings in edx data set 
+
+edx %>%
+  group_by(rating) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = rating, y = count)) +
+  geom_line() +
+  ggtitle("Rating Distribution") +
+  scale_y_log10() +
+  xlab("Rating") +
+  ylab("Count") +
+  theme_stata()
+```
+We can observe from the graph that most movies received a 3 – star or 4 – star ratings.
+
+
+To quantify these ratings by type we performed following code. 
+
+
+```{r}
+# Count of ratings received
+
+ edx %>% group_by(rating) %>% summarize(n=n())
+
+```
+The highest type of rating that was recorded was 4- star rating with a count of 2588430. 
+
+
+Ratings were recorded for almost 14 years. The data set ratings record date back to year 1995.
+
+```{r}
+# Total duration of ratings
+
+tibble(`First Date of Record` = date(as_datetime(min(edx$timestamp), origin="1970-01-01")),
+`Last Date of Record` = date(as_datetime(max(edx$timestamp), origin="1970-01-01"))) %>%
+mutate(Duration = duration(max(edx$timestamp)-min(edx$timestamp)))
+
+```
+
+
+To understand rating distribution more clearly, we plotted a histogram. 
+
+```{r}
+# Plot histogram of rating distribution per year 
+
+edx %>% mutate(year = year(date)) %>%
+  ggplot(aes(year)) + 
+  geom_histogram() +
+  ggtitle("Rating Distribution Per Year") +
+  xlab("Year") +
+  ylab("Number of Ratings") +
+  scale_y_continuous(labels = comma) +
+  theme_stata()
+```
+Year 2000 ranked top in receiving most ratings. 
+
+
+
+Now we’ll observe trend in these ratings when rounded to nearest week. 
+
+```{r}
+# Trend in Ratings
+
+edx %>% mutate(date = round_date(date, unit = "week")) %>%
+  group_by(date) %>%
+  summarize(rating = mean(rating)) %>%
+  ggplot(aes(date, rating)) +
+  geom_point() +
+  geom_smooth() + ggtitle("Trend in Ratings") + theme_stata()
+```
+We can see that there is some evidence of a time effect in the plot, but there is not a very strong effect of time.
+
+
+#GENRES DATA 
+
+There are 787 unique genres in the set. Top three movie genres are Drama, Comedy, and Comedy and Romance respectively
+
+
+```{r}
+################################
+# Exploring Genres Data
+################################
+
+# Top 10 movie genres
+edx %>% group_by(genres) %>% 
+  summarise(n=n()) %>%
+  arrange(desc(n)) %>% top_n(10)
+```
+
+We generated Error bars of top 10 genres to graphically represent the variability in their data set. 
+
+```{r}
+# Top 10 rated genres Error Bar
+edx %>% group_by(genres) %>%
+  summarize(n = n(), Avg = mean(rating), se = sd(rating)/sqrt(n())) %>%
+  arrange(desc(n)) %>% slice(1:10) %>% 
+  mutate(Genres = reorder(genres, Avg)) %>%
+  ggplot(aes(x = Genres, y = Avg, ymin = Avg - 2*se, ymax = Avg + 2*se)) + 
+  geom_point() + 
+  geom_errorbar() + 
+  ggtitle("Top 10 Rated Genres Error Bar ") +         
+  theme_stata(base_size = 5.5)                                                                                                                                                               
+
+```
+
+
+The genres which didn’t do very well are as follows: 
+
+```{r}
+# 10 Worst Genres
+edx %>% group_by(genres) %>% 
+  summarise(n=n()) %>%
+  arrange(n) %>% top_n(-10)
+```
+
+
+The error bars of worst ten genres show quiet a variability. 
+
+
+```{r}
+# Worst 10 rated genres Error Bar
+edx %>% group_by(genres) %>%
+          summarize(n = n(), Avg = mean(rating), se = sd(rating)/sqrt(n())) %>%
+          arrange(n) %>% slice(1:10) %>% 
+          mutate(Genres = reorder(genres, Avg)) %>%
+          ggplot(aes(x = Genres, y = Avg, ymin = Avg - 2*se, ymax = Avg + 2*se)) +
+          geom_point() +
+          geom_errorbar() +  
+          ggtitle("Worst 10 Rated Genres Error Bar ") +
+          theme_stata(base_size = 3.5)
+
+```
+
+
+#DATA MODELING
+
+
+#Linear Model 
+
+One of the simplest approaches to build a Recommendation System is to predict same rating for all movies and users with all the differences explained by random variation. This approach is termed as Naïve bayes approach. Predicted ratings y ̂  are assumed to be equal to mean movie ratings µ and error term which is centered at 0. 
+
+
+\hat y_{u,i}=\mu+\epsilon_{i,u}
+
+One way to explain the same rating assumption is with statistical theory that mean reduces RMSE. 
+To explain variability in our data set more effectively, we’ll weigh in movie effect bias in Naïve Bayes Approach.  Movie Effect bias b_i captures variability in ratings because different movies are rated differently. Often blockbuster movies amass more viewership, hence are rated more often than those which are not so popular and are viewed not so frequently. 
+
+
+\hat y_{u,i}=\mu + b_i + \epsilon_{i,u}
+
+\hat b_i=\frac{1}{N}\sum_{i=1}^{N}(y_i-\hat \mu)
+
+Similarly, different users also rate differently. We termed this as User Effect bias b_u. Some users more generous in giving ratings while others are not so much. 
+
+
+\hat Y_{u,i}=\mu+b_i+b_u+\epsilon_{u,i}
+
+\hat b_u=\frac{1}{N}\sum_{i=1}^{N}(y_{u,i}-\hat b_i-\hat \mu)
+
+
+
+#Regularized Movie & User Linear Model
+
+Regularized Movie and User Linear model constrains the total variability of the movie and user effect bias. That is, it penalizes large estimates of ratings that are formed using small sample sizes of these biases. Instead of minimizing the least squares equation, we minimize an equation that adds a penalty 𝜆. 
+
+
+\frac{1}{N}\sum_{u, i}(y_{u, i}-\mu-b_i-b_u)^2 + \lambda(\sum_i b_{i}^2 + \sum_u b_{u}^2)
+
+\hat b_i=\frac{1}{n_i+\lambda}\sum_{u=1}^{n_i}(y_{u,i}-\hat \mu)
+
+\hat b_u=\frac{1}{n_u+\lambda}\sum_{i=1}^{n_u}( y_{u,i}-\hat b_i-\hat \mu)
+
+
+where n_i is the number of ratings made for movie i. 
+
+When sample size n_i is very large, n_i+ λ ≈ n_i. Our estimate of bias is stable and penalty 𝜆 can be ignored. However, when n_i is small, then the estimate of bias is converged towards 0. 
+
+
+
+#Matrix Factorization 
+
+We have described our liner model like this:
+
+y_{u,i} = \mu + b_i + b_u + \varepsilon_{u,i}
+
+However, this model didn’t factor in variation that is related to fact that groups of movies have similar rating patterns and groups of users have similar rating patterns as well. These patterns emerge by observing residuals. 
+Matrix Factorization estimates matrix of residuals r with product of matrix P and Q, where P is user rating score matrix and Q is movies rating score matrix. 
+r ≈ PQ
+
+
+
+#RESULTS 
+
+Here edx set is partitioned in to two more subsets: Train set and Test set. 90 percent of edx entries are in train set whereas only 10 percent are in test set. We’ll train models with train set and test them on test set. 
+
+
+```{r}
+#######################################
+# Partition edx in to Train & Test Set
+#######################################
+
+set.seed(1, sample.kind="Rounding")
+
+# Test set is 10% of edx 
+
+test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
+train_set <- edx[-test_index,]
+temp <- edx[test_index,]
+
+# Ensure userId and movieId in test set are also in train set
+
+test_set <- temp %>% 
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId")
+
+# Add rows removed from test set back into train set
+
+removed <- anti_join(temp, test_set)
+train_set <- rbind(train_set, removed)
+
+#######################################################
+
+```
+
+Model is evaluated with Root Mean Square Error (RMSE).  
+
+
+```{r}
+
+#####################################
+# Define Root Mean Square Error (RMSE)
+#####################################
+
+RMSE <- function(true_ratings, predicted_ratings){
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+##################################################
+```
+
+#Linear Model 
+
+We’ll begin training our data set with linear model. Linear model here is estimated with this equation: 
+
+\hat y = \mu + b_i + b_u + \epsilon_{u,i}
+
+
+where µ = average ratings, b_i = movie effect, b_u= user effect, ϵ= error term centered at 0
+
+
+#Naïve Bayes Approach  
+
+This approach models data assuming same rating for all movies and users with differences explained by random variation in error term
+
+\hat y = \mu + \epsilon_{u,i}
+
+```{r}
+##################################################
+# Method - Linear Model
+##################################################
+
+#Linear model is estimated with this equation 
+
+# y_hat = mu + bi + bu + epsilon u,i
+
+# where mu = average ratings, bi = movie effect, bu = user effect, epsilon = error term 
+
+
+
+#Naive Bayes Approach
+############################
+
+# y_hat = mu + epsilon u,i
+
+# model assumes same rating for all movies and users with differences explained by random variation in error term.
+
+mu_hat <- mean(train_set$rating)
+
+naive_rmse <- RMSE(test_set$rating, mu_hat)
+
+# create table to store results of approaches applied & respective RMSE
+
+Result <- data.frame(Method = "Naive Bayes Approach", RMSE = naive_rmse)
+
+Result
+
+```
+#Movie Effect Bias - b_i
+
+Since RMSE from Naïve Bayes Approach turned out to be quite high, average rating for movie i is added in the model since different movies are rated differently. 
+
+
+\hat y = \mu + b_i + \epsilon_{u,i}
+
+```{r}
+# Movie Effect
+#################################
+
+# y_hat <- mu + bi + epsilon u, i
+
+# model weights in average rating for movie i since different movies are rated differently
+# determining movie effect 
+
+mu <- mean(train_set$rating)
+
+b_i <- train_set %>% 
+    group_by(movieId) %>% 
+    summarize(bi = mean(rating - mu))
+
+qplot(bi, data = b_i , bins = 10, color = I("black")) +
+    ggtitle("Movie Effect Distribution") +
+    xlab("Movie Effect") +
+    ylab("Count") +
+    scale_y_continuous(labels = comma) + theme_stata()
+
+```
+The plot shows that there is variation is bias and it is not normally distributed. 
+
+
+```{r}
+
+predicted_ratings <- mu + test_set %>% 
+    left_join(b_i, by='movieId') %>%
+    pull(bi)
+
+Result <- bind_rows(Result,
+                         tibble(Method = "Movie Effect Model ",
+                                RMSE = RMSE(test_set$rating, predicted_ratings)))
+Result
+```
+
+# User Effect Bias - b_u
+
+The User Effect Model weights in variation in ratings because different users rate differently.
+
+\hat y_{u,i} = \mu + b_i + b_u + \epsilon_{u,i}
+
+
+```{r}
+# User Effect
+################################
+
+# y_hat = mu + bi + bu + epsilon u,i
+
+# model weights in variation in ratings because different users rate differently
+# determining user effect 
+
+b_u <- train_set %>% 
+  left_join(b_i, by='movieId') %>%
+  group_by(userId) %>%
+  summarize(bu = mean(rating - mu - bi))
+
+qplot(bu, data = b_u , bins = 10, color = I("black")) +
+  ggtitle("User Effect Distribution") +
+  xlab("User Effect") +
+  ylab("Count") +
+  scale_y_continuous(labels = comma) + theme_stata()
+
+```
+The user effect distribution follows a bell-shaped curve. 
+
+```{r}
+predicted_ratings <- test_set %>% 
+  left_join(b_i, by='movieId') %>%
+  left_join(b_u, by='userId') %>%
+  mutate(pred = mu + bi + bu) %>%
+  pull(pred)
+Result <- bind_rows(Result,
+                    tibble(Method = "Movie & User Effect Model ",
+                           RMSE = RMSE(test_set$rating, predicted_ratings)))
+Result
+```
+
+
+#Regularized Movie & User Linear Model
+
+With insights gained in exploring data set, we came across large sets of estimates from small sample of ratings given to movies and ratings given by users. To penalize these estimated we use lambda – λ . 
+
+
+
+\frac{1}{N}\sum_{u, i}(y_{u, i}-\mu-b_i-b_u)^2 + \lambda(\sum_i b_{i}^2 + \sum_u b_{u}^2)
+
+\hat b_i=\frac{1}{n_i+\lambda}\sum_{u=1}^{n_i}(y_{u,i}-\hat \mu)
+
+\hat b_u=\frac{1}{n_u+\lambda}\sum_{i=1}^{n_u}( y_{u,i}-\hat b_i-\hat \mu)
+ 
+
+```{r}
+######################################
+# Method - Regularized Movie & User Model
+#######################################
+
+# penalize large sets of estimates that come from small sample of ratings given to movies and ratings given by users
+# use cross validation to pick lamda
+
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+  
+  mu <- mean(train_set$rating)
+  
+  bi <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(bi = sum(rating - mu)/(n()+l))
+  
+  bu <- train_set %>% 
+    left_join(bi, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(bu = sum(rating - bi - mu)/(n()+l))
+  
+  predicted_ratings <- 
+    test_set %>% 
+    left_join(bi, by = "movieId") %>%
+    left_join(bu, by = "userId") %>%
+    mutate(pred = mu + bi + bu) %>%
+    pull(pred)
+  
+  return(RMSE(test_set$rating, predicted_ratings))
+})
+
+
+```
+
+
+```{r}
+qplot(lambdas, rmses) + ggtitle("Regularization Parameter - Lamda") + theme_stata()
+```
+
+```{r}
+lambda <- lambdas[which.min(rmses)]
+
+lambda
+
+```
+
+```{r}
+regularized_rmse <- min(rmses)
+
+regularized_rmse
+```
+
+```{r}
+Result <- bind_rows(Result, data.frame(Method = "Regularized Movie & User Effect Model ", RMSE = regularized_rmse))
+
+Result
+```
+The RMSE is only 0.0007638 points lower than evaluation criteria set at 0.86490.
+
+#Matrix Factorization 
+
+The model factorizes the matrix of residuals r into a vector P and vector Q, where P is user rating score matrix and Q is movies rating score matrix. 
+r ≈ PQ
+
+The Recommender system package (recosystem) in R estimates rating matrix R_mn by the product of two matrices of lower dimensions, P_nk and Q_nk.  
+To use recosystem, we follow these steps: 
+
+1.Create a model object (a Reference Class object in R) by calling Reco().
+
+2.(Optionally) call the $tune() method to select best tuning parameters along a set of candidate values.
+
+3.Train the model by calling the $train() method. A number of parameters can be set inside the function, possibly coming from the result of $tune().
+
+4.(Optionally) export the model via $output(), i.e. write the factorization matrices PP and QQ into files or return them as R objects.
+
+5.Use the $predict() method to compute predicted values
+
+
+
+```{r}
+#######################################
+# Method - Matrix Factorization 
+#######################################
+
+# model factorize the matrix of residuals r into a vector p and vector q 
+# r approximately equals to pq
+# this approach explains more of the variance in model we used earlier like this
+# y_hat = mu + bi + bu + pq + epsilon 
+# where p is user rating score matrix 
+#       q is movies rating score matrix
+
+#using Recommender System 
+
+if(!require(recosystem))
+  install.packages("recosystem", repos = "http://cran.us.r-project.org")
+
+
+# filtering required inputs
+
+#user_index - integer vector giving the user indices of rating scores
+#item_index - integer vector giving the item indices of rating scores
+#rating     - numeric vector of the observed entries in the rating matrix
+
+train_data <- with(train_set, data_memory(user_index = userId,
+                                          item_index = movieId,
+                                          rating = rating))
+test_data <- with(test_set, data_memory(user_index = userId,
+                                        item_index = movieId,
+                                        rating = rating))
+# r is object returned by Reco()
+
+r <- Reco()
+
+# Using cross validation to tune the model parameters
+
+opts <- r$tune(train_data, opts = list(dim = c(10, 20),
+                                          costp_l1 = c(0, 0.1),
+                                          costp_l2 = c(0.01, 0.1),
+                                          costq_l1 = c(0, 0.1),
+                                          costq_l2 = c(0.01, 0.1),
+                                          lrate = c(0.01, 0.1)))
+```
+
+```{r}
+# training model
+
+r$train(train_data, opts = c(opts$min, nthread = 1, niter = 20))
+
+
+# predicting ratings 
+
+predicted_ratings <- r$predict(test_data, out_memory())
+
+Result <- bind_rows(Result,
+                    tibble(Method = "Matrix Factorization Model ",
+                           RMSE = RMSE(test_set$rating, predicted_ratings)))
+Result
+```
+The Matrix Factorization Model made significant improvement in RMSE. 
+
+#Final Model – Matrix Factorization 
+
+We tried multiple approaches to achieve desired RMSE. However, it is evident from Result table that only Matrix Factorization model have helped us with our objective. Therefore, for our final model, we train edx set with Matrix Factorization and test the model with validation set. 
+
+```{r}
+
+#################################################################
+
+# Final Model 
+
+# Matrix Factorization - Edx & Validation Set  
+
+#################################################################
+
+set.seed(1, sample.kind = "Rounding")
+library(recosystem)
+
+# filtering required inputs from edx set & validation set
+
+edx_rs <- with(edx, data_memory(user_index = userId,
+                                  item_index = movieId,
+                                  rating = rating))
+validation_rs <- with(validation, data_memory(user_index = userId,
+                                                item_index = movieId,
+                                                rating = rating))
+# model object r returned by Reco()
+
+r <- Reco()
+
+# Using cross validation to tune the model parameters
+
+options <- r$tune(edx_rs , opts = list(dim = c(10, 20),
+                                          costp_l1 = c(0, 0.1),
+                                          costp_l2 = c(0.01, 0.1),
+                                          costq_l1 = c(0, 0.1),
+                                          costq_l2 = c(0.01, 0.1),
+                                          lrate = c(0.01, 0.1)))
+
+# training model 
+
+r$train(edx_rs, opts = c(options$min, nthread = 1, niter = 20))
+
+
+# predicting ratings 
+
+predicted_ratings <- r$predict(validation_rs, out_memory())
+
+Result <- bind_rows(Result,
+                    tibble(Method = "Final Matrix Factorization Model ",
+                           RMSE = RMSE(validation$rating, predicted_ratings)))
+
+Result
+
+
+# RMSE of Final Matrix Factorization Model is 0.7885821  which is much lower than evaluation criteria set 
+
+
+```
+
+With Final Matrix Factorization Model, we accomplished an 8.82% lower RMSE than evaluation cutoff of 0.86490. 
+
+
+
+
+#CONCLUSION
+The report documented insights from modelling MovieLens data set through multiple approaches. The first approach, Naïve Bayes approach assumed that all movies received same ratings that is mean of observed ratings. When evaluated, the model didn’t perform well with RMSE equaling to 1.0600537. The approach was then built upon with Movie Effect and Movie and User Effects respectively. After analyzing performance index of these approaches and insights that were gained during data exploration, small sample of ratings given to movies and small sample of ratings given by users were penalized in Regularized Movie and User Effect model. With RMSE still not lower than cut-off of 0.86490, Matrix Factorization Model was adopted to predict ratings. The model helped in achieving the desired RMSE value. 
+
+#LIMITATIONS
+Though Matrix Factorization did provide predictions closer to original ratings with RMSE of 0.7885821, there are some factors which limit its wide application. Firstly, computations are quite expensive in terms of time they cost to compute and memory they consume. Secondly, computations are based on only two predictors: users and movies. Other predictors such as genres were not taken in to account. And lastly, model takes in values of only existing ratings, movies and users. Hence, it must run over and over again if there is an update in values of these predictors. With large data sets, this process can get quite cumbersome and inefficient.
+
+#FUTURE WORK 
+Recommendation Systems are also built with other packages such as Recommender lab package. In future, we can overcome our short comings of models presented in this report with Recommender Lab package or other supporting packages available on CRAN. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
